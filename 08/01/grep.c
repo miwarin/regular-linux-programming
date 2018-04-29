@@ -1,0 +1,66 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <regex.h>
+
+static void do_grep(regex_t* pat, FILE* f);
+
+int main(int ac, char** av)
+{
+	regex_t pat;
+	int err;
+	int i;
+
+	if(ac < 2)
+	{
+		fputs("no pattern", stderr);
+		exit(1);
+	}
+
+	err = regcomp(&pat, av[1],
+		      REG_EXTENDED | /* regexにPOSIX拡張性企業源を使用する */
+		      REG_NOSUB |    /* マッチの場所を報告しない */
+		      REG_NEWLINE    /* すべての文字いにマッチするオペレータに改行をマッチさせない */
+	);
+	if(err != 0)
+	{
+		char buf[1024];
+		regerror(err, &pat, buf, sizeof buf);
+		puts(buf);
+		exit(1);
+	}
+
+	if(ac == 2)
+	{
+		do_grep(&pat, stdin);
+	}
+	else
+	{
+		for(i = 2; i < ac; i++)
+		{
+			FILE* f;
+			if((f = fopen(av[i], "r")) == NULL)
+			{
+				perror(av[i]);
+				exit(1);
+			}
+			do_grep(&pat, f);
+			fclose(f);
+		}
+	}
+	regfree(&pat);
+	exit(0);
+}
+
+static void do_grep(regex_t* pat, FILE* src)
+{
+	char buf[4096];
+	while(fgets(buf, sizeof buf, src))
+	{
+		if(regexec(pat, buf, 0, NULL, 0) == 0)
+		{
+			fputs(buf, stdout);
+		}
+	}
+}
